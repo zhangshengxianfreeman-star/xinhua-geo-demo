@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>新华智鉴 — AI品牌权威诊断系统</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <h1 class="header-title">新华智鉴</h1>
+      <p class="header-subtitle">AI 品牌权威诊断系统</p>
+    </div>
+    <div class="header-status" id="api-status"></div>
+  </div>
+</header>
+
+<!-- ========== Step 1: 搜索入口 ========== -->
+<section class="hero" id="hero-section">
+  <div class="hero-inner">
+    <h2 class="hero-title">输入品牌名称，开启AI健康度诊断</h2>
+    <p class="hero-desc">实时分析品牌在AI搜索引擎中的权威性、可见度与信源表现</p>
+    <div class="search-box">
+      <input type="text" id="brand-input" class="search-input" placeholder="输入品牌名称，如：连花清瘟、新华网…" autocomplete="off">
+      <button id="brand-search-btn" class="search-btn">开始诊断</button>
+    </div>
+    <div class="search-hints">
+      试试输入：
+      <button class="hint-tag" data-q="连花清瘟">连花清瘟</button>
+      <button class="hint-tag" data-q="新华网">新华网</button>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 全局 Loading ========== -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">AI 正在分析中…</div>
+</div>
+
+<!-- ========== Step 2: 品牌诊断结果 ========== -->
+<section class="result-section hidden" id="section-diagnosis">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2 class="section-title">品牌AI健康度诊断</h2>
+      <span class="section-badge" id="diagnosis-brand-name"></span>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">综合AI健康度评分</div>
+        <div id="gauge-chart" style="height:280px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">四维能力雷达</div>
+        <div id="radar-chart" style="height:280px"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">各AI引擎表现对比</div>
+      <div id="engine-chart" style="height:260px"></div>
+    </div>
+
+    <div class="card" id="brand-info-card">
+      <div class="card-title">品牌信息摘要</div>
+      <div class="grid-4" id="dimension-cards"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Step 2.5: 信源权重分析 ========== -->
+<section class="result-section hidden" id="section-sources">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2 class="section-title">信源权重分析</h2>
+    </div>
+
+    <div class="headline-card">
+      <div class="headline-icon">!</div>
+      <h2 class="headline-text">新华网的AI权威悖论</h2>
+      <p class="headline-sub">10个高频医疗问题实测 · 2026年3月</p>
+    </div>
+
+    <div class="grid-2">
+      <div class="card stat-card green">
+        <div class="stat-number">90%</div>
+        <div class="stat-label">新华网内容覆盖率</div>
+        <div class="stat-desc">20个医疗问题中，18个有权威文章</div>
+      </div>
+      <div class="card stat-card red">
+        <div class="stat-number">0%</div>
+        <div class="stat-label">AI搜索Top5出现率</div>
+        <div class="stat-desc">10个核心问题，新华网出现了零次</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">谁在占据新华网的位置？—— AI引用信源排行</div>
+      <div id="source-chart" style="height:400px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">逐题对比：有内容 ≠ 被引用</div>
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th>医疗问题</th>
+            <th>新华网有内容？</th>
+            <th>文章数</th>
+            <th>进入AI Top5？</th>
+            <th>实际排第1的信源</th>
+          </tr>
+        </thead>
+        <tbody id="detail-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">信源竞争力矩阵：内容质量 vs AI可见度</div>
+      <div id="competitor-chart" style="height:380px"></div>
+    </div>
+
+    <div class="callout">
+      <div class="callout-title">核心结论</div>
+      <div class="callout-text">
+        新华网拥有中国医疗领域最强的内容权威性（90%覆盖率），但在AI时代的信息分发中几乎完全"隐身"（0%可见度）。<br><br>
+        原因不在内容质量——而在内容结构。新华网的内容是为"报道"设计的，不是为"回答"设计的。AI引擎需要的是结构化的"回答"。<br><br>
+        <strong>GEO = 把新华网90%的内容覆盖率，转化为90%的AI引用率。</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Step 3: 实时问答测试 ========== -->
+<section class="result-section hidden" id="section-live">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2 class="section-title">实时AI问答测试</h2>
+      <span class="section-badge live" id="live-mode-badge">演示模式</span>
+    </div>
+
+    <div class="card">
+      <p class="live-desc">输入一个医疗问题，看AI引擎怎么回答、引用了哪些信源</p>
+      <div class="search-box compact">
+        <input type="text" id="question-input" class="search-input" placeholder="例如：高血压患者日常饮食应该注意什么？" autocomplete="off">
+        <button id="question-ask-btn" class="search-btn ask">提问</button>
+      </div>
+      <div class="search-hints">
+        快捷问题：
+        <button class="hint-tag" data-live="高血压患者日常饮食应该注意什么？">高血压饮食</button>
+        <button class="hint-tag" data-live="连花清瘟胶囊的功效和适用症状是什么？">连花清瘟功效</button>
+        <button class="hint-tag" data-live="糖尿病的早期症状有哪些？">糖尿病症状</button>
+        <button class="hint-tag" data-live="互联网医疗平台哪个比较靠谱？">互联网医疗</button>
+      </div>
+    </div>
+
+    <!-- 实时问答加载 -->
+    <div class="live-loading hidden" id="live-loading">
+      <div class="loading-spinner small"></div>
+      <span>AI 正在生成回答…</span>
+    </div>
+
+    <!-- 实时问答结果 -->
+    <div class="hidden" id="live-result">
+      <div class="card">
+        <div class="card-title">AI 回答</div>
+        <div class="answer-box" id="live-answer"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">信源分析</div>
+        <div class="live-source-summary" id="live-source-summary"></div>
+        <div id="live-sources"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">权威性评估</div>
+        <div id="live-analysis"></div>
+        <div class="live-score-row" id="live-score-row"></div>
+      </div>
+    </div>
+
+    <!-- 预置匹配结果 -->
+    <div class="hidden" id="preset-result">
+      <div class="demo-mode-banner" id="demo-banner">
+        演示模式：展示预置数据（如需实时AI回答，请配置 API Key）
+      </div>
+      <div id="preset-questions-container"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Step 4: GEO优化对比 ========== -->
+<section class="result-section hidden" id="section-geo">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2 class="section-title">GEO优化效果模拟</h2>
+    </div>
+
+    <div class="card">
+      <div class="card-title">模拟场景</div>
+      <div class="geo-question" id="geo-question"></div>
+    </div>
+
+    <div class="comparison">
+      <div class="card comparison-before">
+        <div class="comparison-label before-label">优化前（当前状态）</div>
+        <div class="answer-box" id="before-answer"></div>
+        <div class="card-title" style="margin-top:16px">引用信源</div>
+        <div id="before-sources"></div>
+        <div class="comparison-score-row" id="before-score"></div>
+      </div>
+      <div class="card comparison-after">
+        <div class="comparison-label after-label">GEO优化后</div>
+        <div class="answer-box" id="after-answer"></div>
+        <div class="card-title" style="margin-top:16px">引用信源</div>
+        <div id="after-sources"></div>
+        <div class="comparison-score-row" id="after-score"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">优化效果量化</div>
+      <div id="improve-bars"></div>
+    </div>
+
+    <div class="callout">
+      <div class="callout-title">GEO优化的本质</div>
+      <div class="callout-text">
+        不是帮新华网"写新内容"——而是把已有的海量权威内容<strong>重新组织</strong>成AI引擎能高效抓取和引用的格式。<br>
+        从新闻叙事体 → 结构化问答体，加入 Schema 标记、FAQ 结构、关键词锚定。<br><br>
+        <strong>效果：AI健康度从42分提升至89分，权威源占比从10%提升至90%。</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <span>新华智鉴 · AI品牌权威诊断系统 · Demo v2.0 (Interactive)</span>
+  <span>数据基于 2026年3月 实验采集</span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
