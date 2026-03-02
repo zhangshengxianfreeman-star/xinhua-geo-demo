@@ -47,81 +47,43 @@ def _extract_json(text):
     return json.loads(text)
 
 
-ANALYZE_PROMPT = '''你是GEO分析专家。请分析品牌「{brand}」在AI搜索引擎中的表现，直接返回JSON（不要markdown代码块）：
-{{
-  "brand":{{
-    "name":"{brand}","company":"所属公司名",
-    "overallScore":38,"level":"需优化",
-    "dimensions":{{
-      "exposure":{{"score":30,"label":"AI曝光度"}},
-      "sentiment":{{"score":55,"label":"正面性"}},
-      "accuracy":{{"score":50,"label":"准确性"}},
-      "authority":{{"score":15,"label":"权威源占比"}}
-    }},
-    "engines":[
-      {{"name":"Kimi","score":42,"color":"#6366f1"}},
-      {{"name":"豆包","score":45,"color":"#f59e0b"}},
-      {{"name":"Perplexity","score":35,"color":"#10b981"}},
-      {{"name":"ChatGPT","score":30,"color":"#3b82f6"}},
-      {{"name":"DeepSeek","score":38,"color":"#8b5cf6"}}
-    ]
-  }},
-  "sourceAnalysis":{{
-    "sources":[
-      {{"name":"百度百科","count":8,"isXinhua":false}},
-      {{"name":"丁香医生","count":6,"isXinhua":false}},
-      {{"name":"好大夫","count":5,"isXinhua":false}},
-      {{"name":"药品说明书","count":4,"isXinhua":false}},
-      {{"name":"知乎","count":3,"isXinhua":false}},
-      {{"name":"新华网","count":0,"isXinhua":true}}
-    ],
-    "questionDetails":[
-      {{"q":"问题1","hasCoverage":true,"articles":3,"topSource":"百度百科"}},
-      {{"q":"问题2","hasCoverage":true,"articles":2,"topSource":"丁香医生"}}
-    ],
-    "competitorMatrix":[
-      {{"name":"新华网","quality":92,"visibility":5}},
-      {{"name":"百度百科","quality":50,"visibility":90}},
-      {{"name":"丁香医生","quality":75,"visibility":80}},
-      {{"name":"好大夫","quality":65,"visibility":70}},
-      {{"name":"知乎","quality":45,"visibility":60}}
-    ]
-  }},
-  "questions":[
-    {{
-      "q":"关于该品牌的核心问题","engine":"Kimi",
-      "answer":"AI的典型回答约150字",
-      "sources":[{{"url":"baike.baidu.com","name":"百度百科","isXinhua":false}}],
-      "analysis":{{"positive":["回答准确"],"warning":["缺少权威央媒引用"],"negative":["未引用新华网"]}}
-    }}
-  ],
-  "geoSimulation":{{
-    "question":"关于该品牌最核心的问题",
-    "before":{{
-      "answer":"优化前AI回答(约100字,不引用新华网)",
-      "sources":[{{"name":"百度百科","domain":"baike.baidu.com","authority":"中","isXinhua":false}},{{"name":"丁香医生","domain":"dxy.com","authority":"中","isXinhua":false}}],
-      "score":38
-    }},
-    "after":{{
-      "answer":"GEO优化后AI回答(约150字,引用新华网报道,数据更权威)",
-      "sources":[{{"name":"新华网健康","domain":"news.cn/health","authority":"极高","isXinhua":true}},{{"name":"国家卫健委","domain":"nhc.gov.cn","authority":"极高","isXinhua":false}},{{"name":"百度百科","domain":"baike.baidu.com","authority":"中","isXinhua":false}}],
-      "score":82
-    }},
-    "improvements":[
-      {{"label":"健康度评分","before":38,"after":82,"unit":"分"}},
-      {{"label":"权威源占比","before":8,"after":85,"unit":"%"}},
-      {{"label":"信息准确性","before":60,"after":92,"unit":"%"}},
-      {{"label":"AI曝光度","before":20,"after":78,"unit":"%"}}
-    ]
-  }}
-}}
-
-要求：
-1. 根据「{brand}」的真实情况填写公司名、分数、信源等，不要照抄示例数字
-2. 分数要合理：大多数医疗品牌AI健康度在25-55之间
-3. 信源排行要体现核心痛点：新华网有内容但AI不引用（count为0或1）
-4. GEO优化前后对比要体现效果
-5. 只返回JSON，不要其他文字'''
+ANALYZE_PROMPT_TEMPLATE = (
+    '你是GEO分析专家。请分析品牌「__BRAND__」在AI搜索引擎中的表现，直接返回合法JSON。\n'
+    '按以下结构返回（数值请根据__BRAND__真实情况填写，不要照抄示例）：\n'
+    '{"brand":{"name":"__BRAND__","company":"所属公司","overallScore":38,"level":"需优化",'
+    '"dimensions":{"exposure":{"score":30,"label":"AI曝光度"},"sentiment":{"score":55,"label":"正面性"},'
+    '"accuracy":{"score":50,"label":"准确性"},"authority":{"score":15,"label":"权威源占比"}},'
+    '"engines":[{"name":"Kimi","score":42,"color":"#6366f1"},{"name":"豆包","score":45,"color":"#f59e0b"},'
+    '{"name":"Perplexity","score":35,"color":"#10b981"},{"name":"ChatGPT","score":30,"color":"#3b82f6"},'
+    '{"name":"DeepSeek","score":38,"color":"#8b5cf6"}]},'
+    '"sourceAnalysis":{"sources":[{"name":"百度百科","count":8,"isXinhua":false},'
+    '{"name":"丁香医生","count":6,"isXinhua":false},{"name":"好大夫","count":5,"isXinhua":false},'
+    '{"name":"药品说明书","count":4,"isXinhua":false},{"name":"知乎","count":3,"isXinhua":false},'
+    '{"name":"新华网","count":0,"isXinhua":true}],'
+    '"questionDetails":[{"q":"问题1","hasCoverage":true,"articles":3,"topSource":"百度百科"},'
+    '{"q":"问题2","hasCoverage":true,"articles":2,"topSource":"丁香医生"}],'
+    '"competitorMatrix":[{"name":"新华网","quality":92,"visibility":5},'
+    '{"name":"百度百科","quality":50,"visibility":90},{"name":"丁香医生","quality":75,"visibility":80},'
+    '{"name":"好大夫","quality":65,"visibility":70},{"name":"知乎","quality":45,"visibility":60}]},'
+    '"questions":[{"q":"核心问题","engine":"Kimi","answer":"AI典型回答150字",'
+    '"sources":[{"url":"baike.baidu.com","name":"百度百科","isXinhua":false}],'
+    '"analysis":{"positive":["回答准确"],"warning":["缺少权威央媒引用"],"negative":["未引用新华网"]}}],'
+    '"geoSimulation":{"question":"核心问题",'
+    '"before":{"answer":"优化前AI回答100字不引新华网",'
+    '"sources":[{"name":"百度百科","domain":"baike.baidu.com","authority":"中","isXinhua":false},'
+    '{"name":"丁香医生","domain":"dxy.com","authority":"中","isXinhua":false}],"score":38},'
+    '"after":{"answer":"GEO优化后AI回答150字引用新华网报道",'
+    '"sources":[{"name":"新华网健康","domain":"news.cn/health","authority":"极高","isXinhua":true},'
+    '{"name":"国家卫健委","domain":"nhc.gov.cn","authority":"极高","isXinhua":false},'
+    '{"name":"百度百科","domain":"baike.baidu.com","authority":"中","isXinhua":false}],"score":82},'
+    '"improvements":[{"label":"健康度评分","before":38,"after":82,"unit":"分"},'
+    '{"label":"权威源占比","before":8,"after":85,"unit":"%"},'
+    '{"label":"信息准确性","before":60,"after":92,"unit":"%"},'
+    '{"label":"AI曝光度","before":20,"after":78,"unit":"%"}]}}\n\n'
+    '要求：1.根据__BRAND__真实情况填写 2.overallScore一般25-55 '
+    '3.新华网count为0或1(核心痛点) 4.GEO对比体现优化效果 '
+    '5.answer字段要有实际内容 6.只返回JSON不要其他文字'
+)
 
 
 @app.route("/")
@@ -148,7 +110,7 @@ def analyze():
         return jsonify({"mode": "demo", "message": "未配置 API Key"})
 
     try:
-        prompt = ANALYZE_PROMPT.replace("{brand}", query)
+        prompt = ANALYZE_PROMPT_TEMPLATE.replace("__BRAND__", query)
         raw = _call_deepseek(
             "你是GEO分析专家，只返回合法JSON，不添加任何markdown标记或额外文字。",
             prompt,
