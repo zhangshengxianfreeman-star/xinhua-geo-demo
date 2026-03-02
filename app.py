@@ -127,9 +127,143 @@ def analyze_answer(text, sources):
     return max(10, min(95, score)), analysis
 
 
+def call_deepseek_json(system_prompt, user_prompt, max_tokens=3000):
+    import requests as req
+    resp = req.post(
+        DEEPSEEK_ENDPOINT,
+        headers={"Authorization": "Bearer " + DEEPSEEK_API_KEY, "Content-Type": "application/json"},
+        json={
+            "model": DEEPSEEK_MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.7,
+            "max_tokens": max_tokens,
+            "response_format": {"type": "json_object"},
+        },
+        timeout=60,
+    )
+    resp.raise_for_status()
+    text = resp.json()["choices"][0]["message"]["content"].strip()
+    return json.loads(text)
+
+
+ANALYZE_SYSTEM_PROMPT = """你是一个GEO（生成式引擎优化）分析专家。用户会输入一个品牌名称（可能是药品、医疗机构、健康平台等），你需要分析该品牌在AI搜索引擎中的表现。
+
+请严格返回以下JSON格式（不要添加任何注释或额外文字）：
+{
+  "brand": {
+    "name": "品牌名",
+    "company": "所属公司",
+    "overallScore": 42,
+    "level": "需优化|一般|良好|优秀",
+    "dimensions": {
+      "exposure": {"score": 35, "label": "AI曝光度"},
+      "sentiment": {"score": 55, "label": "正面性"},
+      "accuracy": {"score": 48, "label": "准确性"},
+      "authority": {"score": 30, "label": "权威源占比"}
+    },
+    "engines": [
+      {"name": "Kimi", "score": 45, "color": "#6366f1"},
+      {"name": "豆包", "score": 50, "color": "#f59e0b"},
+      {"name": "Perplexity", "score": 38, "color": "#10b981"},
+      {"name": "ChatGPT", "score": 35, "color": "#3b82f6"},
+      {"name": "DeepSeek", "score": 40, "color": "#8b5cf6"}
+    ]
+  },
+  "sourceAnalysis": {
+    "sources": [
+      {"name": "信源名称", "count": 4, "isXinhua": false},
+      {"name": "新华网", "count": 0, "isXinhua": true}
+    ],
+    "questionDetails": [
+      {"q": "相关问题", "hasCoverage": true, "articles": 5, "topSource": "排第1的信源"}
+    ],
+    "competitorMatrix": [
+      {"name": "新华网", "quality": 95, "visibility": 0},
+      {"name": "竞争者", "quality": 60, "visibility": 80}
+    ]
+  },
+  "questions": [
+    {
+      "q": "用户最可能问的关于该品牌的问题",
+      "engine": "某AI引擎",
+      "answer": "AI引擎对此问题的典型回答（150-200字）",
+      "sources": [
+        {"url": "example.com/path", "name": "来源名称", "isXinhua": false}
+      ],
+      "analysis": {
+        "positive": ["优点"],
+        "warning": ["注意点"],
+        "negative": ["不足"]
+      }
+    }
+  ],
+  "geoSimulation": {
+    "question": "该品牌最核心的一个问题",
+    "before": {
+      "answer": "优化前的典型AI回答（100-150字，不包含新华网引用）",
+      "sources": [
+        {"name": "来源名", "domain": "domain.com", "authority": "低|中|高", "isXinhua": false}
+      ],
+      "score": 42
+    },
+    "after": {
+      "answer": "GEO优化后的AI回答（150-200字，包含新华网报道引用，数据更准确）",
+      "sources": [
+        {"name": "新华网健康频道", "domain": "news.cn/health", "authority": "极高", "isXinhua": true},
+        {"name": "其他权威源", "domain": "example.gov.cn", "authority": "极高", "isXinhua": false}
+      ],
+      "score": 85
+    },
+    "improvements": [
+      {"label": "健康度评分", "before": 42, "after": 85, "unit": "分"},
+      {"label": "权威源占比", "before": 10, "after": 85, "unit": "%"},
+      {"label": "信息准确性", "before": 60, "after": 90, "unit": "%"},
+      {"label": "AI曝光度", "before": 15, "after": 80, "unit": "%"}
+    ]
+  }
+}
+
+评分规则：
+- overallScore: 综合考虑品牌在AI引擎中被提及的频率、引用权威性、信息准确度。大多数品牌得分在25-55之间（AI引擎目前普遍不引用权威央媒）。
+- 各维度score: 0-100，AI曝光度和权威源占比通常偏低（因为AI引擎倾向引用百科和商业健康平台而非央媒）。
+- engines分数: 不同引擎表现有差异，Kimi和豆包通常稍好。
+- sourceAnalysis.sources: 列出AI引擎回答该品牌相关问题时最常引用的8-12个信源，按引用次数降序。新华网(news.cn)应当出现但count为0或很低（这是GEO要解决的核心问题）。
+- questions: 生成2个该品牌最核心的问题及AI的典型回答，要真实反映当前AI不引用新华网的问题。
+- geoSimulation: before体现当前问题（不引新华网），after体现优化后效果（引用新华网权威报道，数据更精准）。
+
+关键：分析要真实、专业，体现"新华网有内容但AI不引用"这个核心痛点。"""
+
+
 @app.route("/")
 def index():
     return send_from_directory("public", "index.html")
+
+
+@app.route("/api/analyze", methods=["POST"])
+def analyze():
+    body = request.get_json(force=True)
+    query = body.get("query", "").strip()
+    if not query:
+        return jsonify({"error": "\u8bf7\u8f93\u5165\u54c1\u724c\u540d\u79f0"}), 400
+
+    if not DEEPSEEK_API_KEY:
+        return jsonify({"mode": "demo", "message": "\u672a\u914d\u7f6e API Key"})
+
+    try:
+        data = call_deepseek_json(
+            ANALYZE_SYSTEM_PROMPT,
+            "\u8bf7\u5206\u6790\u54c1\u724c\uff1a" + query,
+            max_tokens=3500,
+        )
+        data["mode"] = "live"
+        return jsonify(data)
+    except json.JSONDecodeError:
+        return jsonify({"mode": "error", "error": "AI\u8fd4\u56de\u683c\u5f0f\u89e3\u6790\u5931\u8d25"})
+    except Exception as e:
+        return jsonify({"mode": "error", "error": str(e)})
 
 
 @app.route("/api/status")

@@ -1,26 +1,19 @@
-// 「新华智鉴」Demo v2 — 交互式应用逻辑
+// 「新华智鉴」Demo v3 — 全实时交互版
 (function () {
   "use strict";
 
-  const PRIMARY = "#1a3c6d";
-  const RED = "#b22222";
-  const GREEN = "#10b981";
-  const DANGER = "#ef4444";
+  var PRIMARY = "#1a3c6d", GREEN = "#10b981", DANGER = "#ef4444";
+  var charts = {}, currentBrandId = null, apiConfigured = false;
 
-  let charts = {};
-  let currentBrandId = null;
-  let apiConfigured = false;
+  var $ = function (sel) { return document.querySelector(sel); };
+  var heroSection = $("#hero-section");
+  var brandInput = $("#brand-input");
+  var brandSearchBtn = $("#brand-search-btn");
+  var loadingOverlay = $("#loading-overlay");
+  var loadingText = $(".loading-text");
+  var questionInput = $("#question-input");
+  var questionAskBtn = $("#question-ask-btn");
 
-  // ========== DOM refs ==========
-  const $ = (sel) => document.querySelector(sel);
-  const heroSection = $("#hero-section");
-  const brandInput = $("#brand-input");
-  const brandSearchBtn = $("#brand-search-btn");
-  const loadingOverlay = $("#loading-overlay");
-  const questionInput = $("#question-input");
-  const questionAskBtn = $("#question-ask-btn");
-
-  // ========== API helpers ==========
   function apiPost(url, body) {
     return fetch(url, {
       method: "POST",
@@ -34,37 +27,33 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         apiConfigured = data.api_configured;
-        var statusEl = $("#api-status");
+        var s = $("#api-status");
         if (apiConfigured) {
-          statusEl.textContent = "AI API 已连接 (" + data.api_provider + ")";
-          statusEl.className = "header-status live";
-          $("#live-mode-badge").textContent = "实时模式";
+          s.textContent = "AI API \u5df2\u8fde\u63a5 (" + data.api_provider + ")";
+          s.className = "header-status live";
+          $("#live-mode-badge").textContent = "\u5b9e\u65f6\u6a21\u5f0f";
           $("#live-mode-badge").className = "section-badge live";
         } else {
-          statusEl.textContent = "演示模式";
-          statusEl.className = "header-status demo";
-          $("#live-mode-badge").textContent = "演示模式";
+          s.textContent = "\u6f14\u793a\u6a21\u5f0f";
+          s.className = "header-status demo";
+          $("#live-mode-badge").textContent = "\u6f14\u793a\u6a21\u5f0f";
           $("#live-mode-badge").className = "section-badge demo-mode";
         }
       })
       .catch(function () {
-        apiConfigured = false;
-        var statusEl = $("#api-status");
-        statusEl.textContent = "纯前端模式";
-        statusEl.className = "header-status demo";
+        $("#api-status").textContent = "\u7eaf\u524d\u7aef\u6a21\u5f0f";
+        $("#api-status").className = "header-status demo";
       });
   }
 
-  // ========== Section visibility ==========
   function showSection(id, delay) {
     var el = document.getElementById(id);
     if (!el) return;
     setTimeout(function () {
       el.classList.remove("hidden");
       el.classList.add("visible");
-      if (id === "section-diagnosis") {
-        setTimeout(function () { resizeCharts(); }, 100);
-      }
+      if (id === "section-diagnosis") setTimeout(resizeCharts, 150);
+      if (id === "section-sources") setTimeout(resizeCharts, 150);
     }, delay || 0);
   }
 
@@ -79,118 +68,118 @@
     Object.values(charts).forEach(function (c) { if (c && c.resize) c.resize(); });
   }
 
-  // ========== Brand Search ==========
+  function scrollTo(id) {
+    var el = document.getElementById(id);
+    if (el) setTimeout(function () { el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 200);
+  }
+
+  // ==================== Brand Search ====================
   function handleBrandSearch() {
     var query = brandInput.value.trim();
     if (!query) return;
 
     hideAllSections();
     loadingOverlay.classList.add("show");
+    loadingText.textContent = "AI \u6b63\u5728\u5206\u6790\u300c" + query + "\u300d\u7684 AI \u53ef\u89c1\u5ea6\u2026";
     heroSection.classList.add("compact");
     brandSearchBtn.disabled = true;
 
-    var brandId = matchBrandLocal(query);
-
-    if (brandId) {
-      setTimeout(function () {
+    apiPost("/api/analyze", { query: query })
+      .then(function (data) {
         loadingOverlay.classList.remove("show");
         brandSearchBtn.disabled = false;
-        currentBrandId = brandId;
-        renderDiagnosis(brandId);
-        showSection("section-diagnosis", 0);
-        showSection("section-sources", 300);
-        showSection("section-live", 600);
-        showSection("section-geo", 900);
-        scrollTo("section-diagnosis");
-      }, 800);
-    } else {
-      apiPost("/api/diagnose", { query: query })
-        .then(function (data) {
-          loadingOverlay.classList.remove("show");
-          brandSearchBtn.disabled = false;
-          if (data.mode === "preset" && data.brand_id) {
-            currentBrandId = data.brand_id;
-            renderDiagnosis(data.brand_id);
-            showSection("section-diagnosis", 0);
-            showSection("section-sources", 300);
-            showSection("section-live", 600);
-            showSection("section-geo", 900);
-            scrollTo("section-diagnosis");
-          } else {
-            currentBrandId = "lianhua";
-            renderDiagnosis("lianhua");
-            showSection("section-diagnosis", 0);
-            showSection("section-sources", 300);
-            showSection("section-live", 600);
-            showSection("section-geo", 900);
-            scrollTo("section-diagnosis");
-            $("#diagnosis-brand-name").textContent =
-              query + " (暂无预置数据，展示连花清瘟示例)";
-          }
-        })
-        .catch(function () {
-          loadingOverlay.classList.remove("show");
-          brandSearchBtn.disabled = false;
-          currentBrandId = "lianhua";
-          renderDiagnosis("lianhua");
-          showSection("section-diagnosis", 0);
-          showSection("section-sources", 300);
-          showSection("section-live", 600);
-          showSection("section-geo", 900);
-          scrollTo("section-diagnosis");
-        });
-    }
+
+        if (data.mode === "live" && data.brand) {
+          renderAllFromAI(data, query);
+        } else if (data.mode === "demo" || data.mode === "error") {
+          renderFromPreset(query, data.message || data.error);
+        } else {
+          renderFromPreset(query, null);
+        }
+      })
+      .catch(function () {
+        loadingOverlay.classList.remove("show");
+        brandSearchBtn.disabled = false;
+        renderFromPreset(query, null);
+      });
   }
 
-  function matchBrandLocal(query) {
-    var q = query.toLowerCase();
-    var map = {
-      "连花清瘟": "lianhua", "以岭药业": "lianhua", "lianhua": "lianhua",
-      "新华网": "xinhua_health", "新华网健康": "xinhua_health",
-      "新华": "xinhua_health", "xinhua": "xinhua_health",
-    };
-    for (var key in map) {
-      if (q.indexOf(key.toLowerCase()) !== -1 || key.toLowerCase().indexOf(q) !== -1) {
-        return map[key];
-      }
+  // ==================== Render All from AI ====================
+  function renderAllFromAI(data, query) {
+    var brand = data.brand;
+    $("#diagnosis-brand-name").textContent = brand.name + " / " + brand.company;
+    renderGauge(brand.overallScore, brand.level);
+    renderRadar(brand.dimensions);
+    renderEngineChart(brand.engines || []);
+    renderDimensionCards(brand);
+
+    if (data.sourceAnalysis) {
+      renderSourceChart(data.sourceAnalysis.sources || []);
+      renderDetailTable(data.sourceAnalysis.questionDetails || []);
+      renderCompetitorChart(data.sourceAnalysis.competitorMatrix || []);
     }
-    return null;
+
+    if (data.questions && data.questions.length > 0) {
+      renderQuestionsFromAI(data.questions);
+    }
+
+    if (data.geoSimulation) {
+      renderGEOFromAI(data.geoSimulation);
+    }
+
+    showSection("section-diagnosis", 0);
+    showSection("section-sources", 300);
+    showSection("section-live", 600);
+    showSection("section-geo", 900);
+    scrollTo("section-diagnosis");
   }
 
-  function scrollTo(id) {
-    var el = document.getElementById(id);
-    if (el) {
-      setTimeout(function () {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 200);
-    }
-  }
-
-  // ========== Render Diagnosis ==========
-  function renderDiagnosis(brandId) {
+  function renderFromPreset(query, msg) {
+    var brandId = matchBrandLocal(query) || "lianhua";
+    currentBrandId = brandId;
     var brand = DEMO_DATA.brands[brandId];
     if (!brand) return;
 
-    $("#diagnosis-brand-name").textContent = brand.name + " / " + brand.company;
+    var label = brand.name + " / " + brand.company;
+    if (msg) label += " (" + msg + ")";
+    $("#diagnosis-brand-name").textContent = label;
 
     renderGauge(brand.overallScore, brand.level);
     renderRadar(brand.dimensions);
     renderEngineChart(brand.engines);
     renderDimensionCards(brand);
+    renderSourceChart(DEMO_DATA.sourceAnalysis.sources);
+    renderDetailTable(DEMO_DATA.sourceAnalysis.questionDetails);
+    renderCompetitorChart(DEMO_DATA.sourceAnalysis.competitorMatrix);
+    renderGEOFromAI(DEMO_DATA.geoSimulation);
 
-    renderSourceAnalysis();
-    renderGEO();
+    showSection("section-diagnosis", 0);
+    showSection("section-sources", 300);
+    showSection("section-live", 600);
+    showSection("section-geo", 900);
+    scrollTo("section-diagnosis");
   }
 
+  function matchBrandLocal(query) {
+    var q = query.toLowerCase();
+    var map = {
+      "\u8fde\u82b1\u6e05\u761f": "lianhua", "\u4ee5\u5cad\u836f\u4e1a": "lianhua",
+      "\u65b0\u534e\u7f51": "xinhua_health", "\u65b0\u534e": "xinhua_health",
+    };
+    for (var key in map) {
+      if (q.indexOf(key.toLowerCase()) !== -1 || key.toLowerCase().indexOf(q) !== -1) return map[key];
+    }
+    return null;
+  }
+
+  // ==================== Chart Renderers ====================
   function renderGauge(score, level) {
-    var container = document.getElementById("gauge-chart");
-    if (!container) return;
-    if (!charts.gauge) charts.gauge = echarts.init(container);
+    var c = document.getElementById("gauge-chart"); if (!c) return;
+    if (!charts.gauge) charts.gauge = echarts.init(c);
     var color = score >= 70 ? GREEN : score >= 50 ? "#f59e0b" : DANGER;
     charts.gauge.setOption({
       series: [{
-        type: "gauge", startAngle: 200, endAngle: -20,
-        min: 0, max: 100, splitNumber: 10,
+        type: "gauge", startAngle: 200, endAngle: -20, min: 0, max: 100, splitNumber: 10,
         itemStyle: { color: color },
         progress: { show: true, width: 22, roundCap: true },
         pointer: { show: false },
@@ -208,9 +197,8 @@
   }
 
   function renderRadar(dims) {
-    var container = document.getElementById("radar-chart");
-    if (!container) return;
-    if (!charts.radar) charts.radar = echarts.init(container);
+    var c = document.getElementById("radar-chart"); if (!c) return;
+    if (!charts.radar) charts.radar = echarts.init(c);
     var keys = Object.keys(dims);
     charts.radar.setOption({
       radar: {
@@ -223,11 +211,9 @@
       },
       series: [{
         type: "radar",
-        data: [{
-          value: keys.map(function (k) { return dims[k].score; }),
+        data: [{ value: keys.map(function (k) { return dims[k].score; }),
           areaStyle: { color: "rgba(26,60,109,.12)" },
-          lineStyle: { color: PRIMARY, width: 2 },
-          itemStyle: { color: PRIMARY },
+          lineStyle: { color: PRIMARY, width: 2 }, itemStyle: { color: PRIMARY },
         }],
         symbol: "circle", symbolSize: 6,
       }],
@@ -235,11 +221,11 @@
   }
 
   function renderEngineChart(engines) {
-    var container = document.getElementById("engine-chart");
-    if (!container) return;
-    if (!charts.engine) charts.engine = echarts.init(container);
+    var c = document.getElementById("engine-chart"); if (!c) return;
+    if (!charts.engine) charts.engine = echarts.init(c);
+    var defaultColors = ["#6366f1", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6"];
     charts.engine.setOption({
-      grid: { left: 80, right: 30, top: 10, bottom: 30 },
+      grid: { left: 100, right: 40, top: 10, bottom: 30 },
       xAxis: { type: "value", max: 100, splitLine: { lineStyle: { color: "#f1f5f9" } }, axisLabel: { color: "#94a3b8" } },
       yAxis: {
         type: "category",
@@ -249,87 +235,59 @@
       },
       series: [{
         type: "bar",
-        data: engines.map(function (e) {
+        data: engines.map(function (e, i) {
+          var cl = e.color || defaultColors[i % defaultColors.length];
           return {
             value: e.score,
             itemStyle: {
               color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                { offset: 0, color: e.color + "88" },
-                { offset: 1, color: e.color },
+                { offset: 0, color: cl + "88" }, { offset: 1, color: cl },
               ]),
               borderRadius: [0, 6, 6, 0],
             },
           };
         }).reverse(),
         barWidth: 28,
-        label: { show: true, position: "right", fontSize: 14, fontWeight: 700, color: "#475569", formatter: "{c}分" },
+        label: { show: true, position: "right", fontSize: 14, fontWeight: 700, color: "#475569", formatter: "{c}\u5206" },
       }],
       animationDuration: 800,
     });
   }
 
   function renderDimensionCards(brand) {
-    var container = document.getElementById("dimension-cards");
-    if (!container) return;
+    var c = document.getElementById("dimension-cards"); if (!c) return;
     var dims = brand.dimensions;
-    container.innerHTML = Object.keys(dims).map(function (k) {
+    c.innerHTML = Object.keys(dims).map(function (k) {
       var d = dims[k];
-      var color = d.score >= 60 ? GREEN : d.score >= 40 ? "#f59e0b" : DANGER;
-      return '<div class="dim-card"><div class="dim-score" style="color:' + color + '">' +
+      var cl = d.score >= 60 ? GREEN : d.score >= 40 ? "#f59e0b" : DANGER;
+      return '<div class="dim-card"><div class="dim-score" style="color:' + cl + '">' +
         d.score + '</div><div class="dim-label">' + d.label + "</div></div>";
     }).join("");
   }
 
-  // ========== Source Analysis ==========
-  function renderSourceAnalysis() {
-    renderSourceChart();
-    renderDetailTable();
-    renderCompetitorChart();
-  }
-
-  function renderSourceChart() {
-    var container = document.getElementById("source-chart");
-    if (!container) return;
-    if (!charts.source) charts.source = echarts.init(container);
-    var data = DEMO_DATA.sourceAnalysis.sources;
+  function renderSourceChart(sources) {
+    var c = document.getElementById("source-chart"); if (!c) return;
+    if (!charts.source) charts.source = echarts.init(c);
     charts.source.setOption({
       grid: { left: 120, right: 40, top: 10, bottom: 30 },
-      xAxis: {
-        type: "value",
-        axisLabel: { color: "#94a3b8", formatter: "{value}次" },
-        splitLine: { lineStyle: { color: "#f1f5f9" } },
-      },
+      xAxis: { type: "value", axisLabel: { color: "#94a3b8", formatter: "{value}\u6b21" }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
       yAxis: {
         type: "category",
-        data: data.map(function (d) { return d.name; }).reverse(),
+        data: sources.map(function (d) { return d.name; }).reverse(),
         axisLine: { show: false }, axisTick: { show: false },
         axisLabel: {
           fontSize: 13,
-          rich: {
-            xinhua: { color: DANGER, fontWeight: 700, fontSize: 14 },
-            normal: { color: "#475569", fontSize: 13 },
-          },
-          formatter: function (value) {
-            return value === "新华网" ? "{xinhua|" + value + "}" : "{normal|" + value + "}";
-          },
+          rich: { xinhua: { color: DANGER, fontWeight: 700, fontSize: 14 }, normal: { color: "#475569", fontSize: 13 } },
+          formatter: function (v) { return v === "\u65b0\u534e\u7f51" ? "{xinhua|" + v + "}" : "{normal|" + v + "}"; },
         },
       },
       series: [{
         type: "bar",
-        data: data.map(function (d) {
+        data: sources.map(function (d) {
           return {
             value: d.count,
-            itemStyle: {
-              color: d.isXinhua ? DANGER : PRIMARY,
-              borderRadius: [0, 4, 4, 0],
-              opacity: d.isXinhua ? 1 : 0.7,
-            },
-            label: {
-              show: true, position: "right",
-              formatter: d.isXinhua ? "{c}次 ← 新华网" : "{c}次",
-              color: d.isXinhua ? DANGER : "#94a3b8",
-              fontWeight: d.isXinhua ? 700 : 400,
-            },
+            itemStyle: { color: d.isXinhua ? DANGER : PRIMARY, borderRadius: [0, 4, 4, 0], opacity: d.isXinhua ? 1 : 0.7 },
+            label: { show: true, position: "right", formatter: d.isXinhua ? "{c}\u6b21 \u2190 \u65b0\u534e\u7f51" : "{c}\u6b21", color: d.isXinhua ? DANGER : "#94a3b8", fontWeight: d.isXinhua ? 700 : 400 },
           };
         }).reverse(),
         barWidth: 22,
@@ -338,135 +296,109 @@
     });
   }
 
-  function renderDetailTable() {
-    var tbody = document.getElementById("detail-tbody");
-    if (!tbody) return;
-    tbody.innerHTML = DEMO_DATA.sourceAnalysis.questionDetails.map(function (item) {
-      return "<tr>" +
-        "<td>" + item.q + "</td>" +
-        "<td>" + (item.hasCoverage ? '<span class="badge-yes">有 (' + item.articles + "篇)</span>" : '<span class="badge-no">无</span>') + "</td>" +
-        "<td>" + item.articles + "</td>" +
-        "<td><span class=\"badge-no\">未进入</span></td>" +
-        "<td><strong>" + item.topSource + "</strong></td>" +
-        "</tr>";
+  function renderDetailTable(details) {
+    var tbody = document.getElementById("detail-tbody"); if (!tbody) return;
+    tbody.innerHTML = details.map(function (item) {
+      return "<tr><td>" + item.q + "</td><td>" +
+        (item.hasCoverage ? '<span class="badge-yes">\u6709 (' + item.articles + "\u7bc7)</span>" : '<span class="badge-no">\u65e0</span>') +
+        "</td><td>" + item.articles + '</td><td><span class="badge-no">\u672a\u8fdb\u5165</span></td><td><strong>' + item.topSource + "</strong></td></tr>";
     }).join("");
   }
 
-  function renderCompetitorChart() {
-    var container = document.getElementById("competitor-chart");
-    if (!container) return;
-    if (!charts.competitor) charts.competitor = echarts.init(container);
-    var data = DEMO_DATA.sourceAnalysis.competitorMatrix;
+  function renderCompetitorChart(matrix) {
+    var c = document.getElementById("competitor-chart"); if (!c) return;
+    if (!charts.competitor) charts.competitor = echarts.init(c);
     charts.competitor.setOption({
       grid: { left: 60, right: 30, top: 40, bottom: 50 },
-      xAxis: {
-        name: "内容质量", nameLocation: "center", nameGap: 30,
-        nameTextStyle: { color: "#64748b", fontSize: 13 },
-        min: 0, max: 100,
-        axisLabel: { color: "#94a3b8" },
-        splitLine: { lineStyle: { color: "#f1f5f9" } },
-      },
-      yAxis: {
-        name: "AI可见度", nameLocation: "center", nameGap: 35,
-        nameTextStyle: { color: "#64748b", fontSize: 13 },
-        min: 0, max: 100,
-        axisLabel: { color: "#94a3b8" },
-        splitLine: { lineStyle: { color: "#f1f5f9" } },
-      },
+      xAxis: { name: "\u5185\u5bb9\u8d28\u91cf", nameLocation: "center", nameGap: 30, nameTextStyle: { color: "#64748b", fontSize: 13 }, min: 0, max: 100, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+      yAxis: { name: "AI\u53ef\u89c1\u5ea6", nameLocation: "center", nameGap: 35, nameTextStyle: { color: "#64748b", fontSize: 13 }, min: 0, max: 100, axisLabel: { color: "#94a3b8" }, splitLine: { lineStyle: { color: "#f1f5f9" } } },
       series: [{
         type: "scatter", symbolSize: 20,
-        data: data.map(function (d) {
-          return {
-            value: [d.quality, d.visibility], name: d.name,
-            itemStyle: { color: d.name === "新华网" ? DANGER : d.name === "央广网" ? "#f59e0b" : PRIMARY },
-          };
+        data: matrix.map(function (d) {
+          return { value: [d.quality, d.visibility], name: d.name,
+            itemStyle: { color: d.name === "\u65b0\u534e\u7f51" ? DANGER : d.name.indexOf("\u592e\u5e7f") !== -1 ? "#f59e0b" : PRIMARY } };
         }),
-        label: {
-          show: true,
-          formatter: function (p) { return p.data.name; },
-          position: "top", fontSize: 13, color: "#475569",
-        },
+        label: { show: true, formatter: function (p) { return p.data.name; }, position: "top", fontSize: 13, color: "#475569" },
       }],
       graphic: [
-        { type: "text", left: "72%", top: "8%", style: { text: "理想区域 →", fill: GREEN, fontSize: 13, fontWeight: 600 } },
-        { type: "text", left: "8%", bottom: "16%", style: { text: "← 新华网当前位置\n（高质量 低可见度）", fill: DANGER, fontSize: 12 } },
+        { type: "text", left: "72%", top: "8%", style: { text: "\u7406\u60f3\u533a\u57df \u2192", fill: GREEN, fontSize: 13, fontWeight: 600 } },
+        { type: "text", left: "8%", bottom: "16%", style: { text: "\u2190 \u65b0\u534e\u7f51\u5f53\u524d\u4f4d\u7f6e\n\uff08\u9ad8\u8d28\u91cf \u4f4e\u53ef\u89c1\u5ea6\uff09", fill: DANGER, fontSize: 12 } },
       ],
       animationDuration: 1000,
     });
   }
 
-  // ========== GEO Comparison ==========
-  function renderGEO() {
-    var sim = DEMO_DATA.geoSimulation;
+  // ==================== AI Q&A Render ====================
+  function renderQuestionsFromAI(questions) {
+    var container = document.getElementById("preset-questions-container"); if (!container) return;
+    document.getElementById("preset-result").classList.remove("hidden");
+    document.getElementById("demo-banner").style.display = "none";
+
+    container.innerHTML = questions.map(function (item) {
+      var srcHtml = (item.sources || []).map(function (s) {
+        return '<div class="source-item' + (s.isXinhua ? " xinhua" : "") + '"><span class="source-name">' + s.name + '</span><span class="source-url">' + s.url + '</span></div>';
+      }).join("");
+      var tagHtml = []
+        .concat((item.analysis.positive || []).map(function (t) { return '<div class="tag tag-positive">' + t + "</div>"; }))
+        .concat((item.analysis.warning || []).map(function (t) { return '<div class="tag tag-warning">' + t + "</div>"; }))
+        .concat((item.analysis.negative || []).map(function (t) { return '<div class="tag tag-negative">' + t + "</div>"; }))
+        .join("");
+      return '<div class="question-card"><div class="question-label">' + item.q +
+        '</div><div class="question-engine">AI\u5f15\u64ce\uff1a' + item.engine +
+        '</div><div class="answer-box">' + item.answer +
+        '</div><div class="card-title" style="margin:14px 0 8px">\u5f15\u7528\u4fe1\u6e90</div><div class="source-list">' + srcHtml +
+        '</div><div class="card-title" style="margin:14px 0 8px">\u667a\u80fd\u5206\u6790</div><div class="analysis-tags">' + tagHtml + '</div></div>';
+    }).join("");
+  }
+
+  // ==================== GEO Render ====================
+  function renderGEOFromAI(sim) {
     var geoQ = document.getElementById("geo-question");
-    if (geoQ) geoQ.textContent = "用户提问：「" + sim.question + "」";
+    if (geoQ) geoQ.textContent = "\u7528\u6237\u63d0\u95ee\uff1a\u300c" + sim.question + "\u300d";
 
-    var beforeAns = document.getElementById("before-answer");
-    var afterAns = document.getElementById("after-answer");
-    if (beforeAns) beforeAns.textContent = sim.before.answer;
-    if (afterAns) afterAns.textContent = sim.after.answer;
+    var ba = document.getElementById("before-answer"), aa = document.getElementById("after-answer");
+    if (ba) ba.textContent = sim.before.answer;
+    if (aa) aa.textContent = sim.after.answer;
 
-    renderSourceList("before-sources", sim.before.sources);
-    renderSourceList("after-sources", sim.after.sources);
+    renderGeoSources("before-sources", sim.before.sources || []);
+    renderGeoSources("after-sources", sim.after.sources || []);
 
-    var beforeScore = document.getElementById("before-score");
-    var afterScore = document.getElementById("after-score");
-    if (beforeScore) {
-      beforeScore.innerHTML =
-        '<div class="score-badge low">' + sim.before.score + '</div><div class="score-badge-label">AI健康度</div>';
-    }
-    if (afterScore) {
-      afterScore.innerHTML =
-        '<div class="score-badge high">' + sim.after.score + '</div><div class="score-badge-label">AI健康度</div>';
-    }
+    var bs = document.getElementById("before-score"), as2 = document.getElementById("after-score");
+    if (bs) bs.innerHTML = '<div class="score-badge low">' + sim.before.score + '</div><div class="score-badge-label">AI\u5065\u5eb7\u5ea6</div>';
+    if (as2) as2.innerHTML = '<div class="score-badge high">' + sim.after.score + '</div><div class="score-badge-label">AI\u5065\u5eb7\u5ea6</div>';
 
-    renderImproveBars(sim.improvements);
+    renderImproveBars(sim.improvements || []);
   }
 
-  function renderSourceList(containerId, sources) {
-    var el = document.getElementById(containerId);
-    if (!el) return;
+  function renderGeoSources(id, sources) {
+    var el = document.getElementById(id); if (!el) return;
     el.innerHTML = sources.map(function (s) {
-      return '<div class="source-item' + (s.isXinhua ? " xinhua" : "") + '">' +
-        '<span class="source-name">' + s.name + '</span>' +
-        '<span class="source-url">' + s.domain + "</span>" +
-        '<span style="margin-left:8px;font-size:12px;color:#94a3b8">权威性：' + s.authority + "</span></div>";
+      return '<div class="source-item' + (s.isXinhua ? " xinhua" : "") + '"><span class="source-name">' + s.name +
+        '</span><span class="source-url">' + s.domain + '</span><span style="margin-left:8px;font-size:12px;color:#94a3b8">\u6743\u5a01\u6027\uff1a' + s.authority + '</span></div>';
     }).join("");
   }
 
-  function renderImproveBars(improvements) {
-    var container = document.getElementById("improve-bars");
-    if (!container) return;
-    container.innerHTML = improvements.map(function (item) {
-      return '<div class="improve-row">' +
-        '<div class="improve-label">' + item.label + '</div>' +
-        '<div class="improve-bar">' +
-        '<div class="improve-fill-before" style="width:0%" data-w="' + item.before + '%"></div>' +
-        '<div class="improve-fill-after" style="width:0%" data-w="' + item.after + '%"></div>' +
-        '</div>' +
-        '<div class="improve-values">' +
-        '<span class="val-before">' + item.before + item.unit + '</span> → ' +
-        '<span class="val-after">' + item.after + item.unit + '</span>' +
-        '</div></div>';
+  function renderImproveBars(imps) {
+    var c = document.getElementById("improve-bars"); if (!c) return;
+    c.innerHTML = imps.map(function (i) {
+      return '<div class="improve-row"><div class="improve-label">' + i.label +
+        '</div><div class="improve-bar"><div class="improve-fill-before" style="width:0%" data-w="' + i.before +
+        '%"></div><div class="improve-fill-after" style="width:0%" data-w="' + i.after +
+        '%"></div></div><div class="improve-values"><span class="val-before">' + i.before + i.unit +
+        '</span> \u2192 <span class="val-after">' + i.after + i.unit + '</span></div></div>';
     }).join("");
-
     requestAnimationFrame(function () {
       setTimeout(function () {
-        container.querySelectorAll(".improve-fill-before").forEach(function (el) {
-          el.style.width = el.dataset.w;
-        });
-        container.querySelectorAll(".improve-fill-after").forEach(function (el) {
-          el.style.width = el.dataset.w;
-        });
+        c.querySelectorAll(".improve-fill-before").forEach(function (el) { el.style.width = el.dataset.w; });
+        c.querySelectorAll(".improve-fill-after").forEach(function (el) { el.style.width = el.dataset.w; });
       }, 100);
     });
   }
 
-  // ========== Live Q&A ==========
+  // ==================== Live Q&A ====================
   function handleQuestion() {
     var question = questionInput.value.trim();
     if (!question) return;
-
     questionAskBtn.disabled = true;
     document.getElementById("live-result").classList.add("hidden");
     document.getElementById("preset-result").classList.add("hidden");
@@ -476,12 +408,8 @@
       .then(function (data) {
         document.getElementById("live-loading").classList.add("hidden");
         questionAskBtn.disabled = false;
-
-        if (data.mode === "live") {
-          renderLiveResult(data);
-        } else if (data.mode === "demo" || data.mode === "error") {
-          renderPresetResult(data, question);
-        }
+        if (data.mode === "live") renderLiveResult(data);
+        else renderPresetFallback(question);
       })
       .catch(function () {
         document.getElementById("live-loading").classList.add("hidden");
@@ -493,148 +421,62 @@
   function renderLiveResult(data) {
     var el = document.getElementById("live-result");
     el.classList.remove("hidden");
-
     document.getElementById("live-answer").textContent = data.answer;
 
-    var summaryEl = document.getElementById("live-source-summary");
-    summaryEl.innerHTML = "";
-    if (data.sources.mentions_xinhua) {
-      summaryEl.innerHTML += '<div class="source-pill yes"><span class="dot"></span>引用了新华网</div>';
-    } else {
-      summaryEl.innerHTML += '<div class="source-pill no"><span class="dot"></span>未引用新华网</div>';
-    }
-    if (data.sources.mentions_wedoctor) {
-      summaryEl.innerHTML += '<div class="source-pill yes"><span class="dot"></span>提及微医</div>';
-    }
-    summaryEl.innerHTML += '<div class="source-pill ' + (data.sources.urls.length > 0 ? "yes" : "no") + '"><span class="dot"></span>' +
-      data.sources.urls.length + '个引用链接</div>';
+    var sum = document.getElementById("live-source-summary");
+    sum.innerHTML = "";
+    sum.innerHTML += '<div class="source-pill ' + (data.sources.mentions_xinhua ? "yes" : "no") + '"><span class="dot"></span>' + (data.sources.mentions_xinhua ? "\u5f15\u7528\u4e86\u65b0\u534e\u7f51" : "\u672a\u5f15\u7528\u65b0\u534e\u7f51") + '</div>';
+    if (data.sources.mentions_wedoctor) sum.innerHTML += '<div class="source-pill yes"><span class="dot"></span>\u63d0\u53ca\u5fae\u533b</div>';
+    sum.innerHTML += '<div class="source-pill ' + (data.sources.urls.length > 0 ? "yes" : "no") + '"><span class="dot"></span>' + data.sources.urls.length + '\u4e2a\u5f15\u7528\u94fe\u63a5</div>';
 
-    var sourcesEl = document.getElementById("live-sources");
+    var srcEl = document.getElementById("live-sources");
     if (data.sources.urls.length > 0) {
-      sourcesEl.innerHTML = data.sources.urls.map(function (s) {
+      srcEl.innerHTML = data.sources.urls.map(function (s) {
         var isXH = s.domain.indexOf("news.cn") !== -1 || s.domain.indexOf("xinhua") !== -1;
-        return '<div class="source-item' + (isXH ? " xinhua" : "") + '">' +
-          '<span class="source-name">' + s.domain + '</span>' +
-          '<span class="source-url">' + s.url + '</span></div>';
+        return '<div class="source-item' + (isXH ? " xinhua" : "") + '"><span class="source-name">' + s.domain + '</span><span class="source-url">' + s.url + '</span></div>';
       }).join("");
     } else if (data.sources.named_sources.length > 0) {
-      sourcesEl.innerHTML = data.sources.named_sources.map(function (s) {
-        return '<div class="source-item"><span class="source-name">' + s + '</span></div>';
-      }).join("");
+      srcEl.innerHTML = data.sources.named_sources.map(function (s) { return '<div class="source-item"><span class="source-name">' + s + '</span></div>'; }).join("");
     } else {
-      sourcesEl.innerHTML = '<div class="source-item"><span class="source-name" style="color:#94a3b8">AI未提供明确来源链接</span></div>';
+      srcEl.innerHTML = '<div class="source-item"><span class="source-name" style="color:#94a3b8">AI\u672a\u63d0\u4f9b\u660e\u786e\u6765\u6e90\u94fe\u63a5</span></div>';
     }
 
-    var analysisEl = document.getElementById("live-analysis");
-    var analysis = data.analysis;
+    var aEl = document.getElementById("live-analysis");
     var tags = [];
-    (analysis.positive || []).forEach(function (t) { tags.push('<div class="tag tag-positive">' + t + '</div>'); });
-    (analysis.warning || []).forEach(function (t) { tags.push('<div class="tag tag-warning">' + t + '</div>'); });
-    (analysis.negative || []).forEach(function (t) { tags.push('<div class="tag tag-negative">' + t + '</div>'); });
-    analysisEl.innerHTML = '<div class="analysis-tags">' + tags.join("") + '</div>';
+    (data.analysis.positive || []).forEach(function (t) { tags.push('<div class="tag tag-positive">' + t + '</div>'); });
+    (data.analysis.warning || []).forEach(function (t) { tags.push('<div class="tag tag-warning">' + t + '</div>'); });
+    (data.analysis.negative || []).forEach(function (t) { tags.push('<div class="tag tag-negative">' + t + '</div>'); });
+    aEl.innerHTML = '<div class="analysis-tags">' + tags.join("") + '</div>';
 
-    var scoreRow = document.getElementById("live-score-row");
-    var sc = data.score;
-    var cls = sc >= 70 ? "high" : sc >= 45 ? "mid" : "low";
-    scoreRow.innerHTML = '<div class="live-score-circle ' + cls + '">' + sc + '</div>' +
-      '<div style="font-size:14px;color:#64748b">权威性评分</div>';
-
+    var sr = document.getElementById("live-score-row");
+    var cls = data.score >= 70 ? "high" : data.score >= 45 ? "mid" : "low";
+    sr.innerHTML = '<div class="live-score-circle ' + cls + '">' + data.score + '</div><div style="font-size:14px;color:#64748b">\u6743\u5a01\u6027\u8bc4\u5206</div>';
     scrollTo("live-result");
-  }
-
-  function renderPresetResult(data, question) {
-    var el = document.getElementById("preset-result");
-    el.classList.remove("hidden");
-
-    var banner = document.getElementById("demo-banner");
-    if (data.mode === "error") {
-      banner.textContent = "API 调用异常：" + (data.error || "未知错误") + "，使用预置数据展示";
-    } else {
-      banner.textContent = "演示模式：展示预置数据（如需实时AI回答，请配置 API Key）";
-    }
-
-    renderPresetQuestions(question);
   }
 
   function renderPresetFallback(question) {
     var el = document.getElementById("preset-result");
     el.classList.remove("hidden");
-    document.getElementById("demo-banner").textContent = "当前为纯前端模式，展示预置数据";
-    renderPresetQuestions(question);
-  }
-
-  function renderPresetQuestions(question) {
-    var container = document.getElementById("preset-questions-container");
-    if (!container) return;
-
+    document.getElementById("demo-banner").style.display = "";
+    document.getElementById("demo-banner").textContent = "\u6f14\u793a\u6a21\u5f0f\uff1a\u5c55\u793a\u9884\u7f6e\u6570\u636e";
     var brand = DEMO_DATA.brands[currentBrandId || "lianhua"];
     if (!brand || !brand.questions) return;
-
-    var matched = null;
-    if (question) {
-      brand.questions.forEach(function (item) {
-        var overlap = 0;
-        for (var i = 0; i < question.length; i++) {
-          if (item.q.indexOf(question[i]) !== -1) overlap++;
-        }
-        if (overlap >= question.length * 0.3) matched = item;
-      });
-    }
-
-    var items = matched ? [matched] : brand.questions;
-
-    container.innerHTML = items.map(function (item, idx) {
-      var sourcesHtml = item.sources.map(function (s) {
-        return '<div class="source-item' + (s.isXinhua ? " xinhua" : "") + '">' +
-          '<span class="source-name">' + s.name + "</span>" +
-          '<span class="source-url">' + s.url + "</span></div>";
-      }).join("");
-
-      var tagsHtml = []
-        .concat((item.analysis.positive || []).map(function (t) { return '<div class="tag tag-positive">' + t + "</div>"; }))
-        .concat((item.analysis.warning || []).map(function (t) { return '<div class="tag tag-warning">' + t + "</div>"; }))
-        .concat((item.analysis.negative || []).map(function (t) { return '<div class="tag tag-negative">' + t + "</div>"; }))
-        .join("");
-
-      return '<div class="question-card">' +
-        '<div class="question-label">' + item.q + "</div>" +
-        '<div class="question-engine">AI引擎：' + item.engine + "</div>" +
-        '<div class="answer-box">' + item.answer + "</div>" +
-        '<div class="card-title" style="margin:14px 0 8px">引用信源</div>' +
-        '<div class="source-list">' + sourcesHtml + "</div>" +
-        '<div class="card-title" style="margin:14px 0 8px">智能分析</div>' +
-        '<div class="analysis-tags">' + tagsHtml + "</div>" +
-        "</div>";
+    var container = document.getElementById("preset-questions-container");
+    container.innerHTML = brand.questions.map(function (item) {
+      var srcHtml = item.sources.map(function (s) { return '<div class="source-item' + (s.isXinhua ? " xinhua" : "") + '"><span class="source-name">' + s.name + '</span><span class="source-url">' + s.url + '</span></div>'; }).join("");
+      var tagHtml = [].concat((item.analysis.positive || []).map(function (t) { return '<div class="tag tag-positive">' + t + "</div>"; })).concat((item.analysis.warning || []).map(function (t) { return '<div class="tag tag-warning">' + t + "</div>"; })).concat((item.analysis.negative || []).map(function (t) { return '<div class="tag tag-negative">' + t + "</div>"; })).join("");
+      return '<div class="question-card"><div class="question-label">' + item.q + '</div><div class="question-engine">AI\u5f15\u64ce\uff1a' + item.engine + '</div><div class="answer-box">' + item.answer + '</div><div class="card-title" style="margin:14px 0 8px">\u5f15\u7528\u4fe1\u6e90</div><div class="source-list">' + srcHtml + '</div><div class="card-title" style="margin:14px 0 8px">\u667a\u80fd\u5206\u6790</div><div class="analysis-tags">' + tagHtml + '</div></div>';
     }).join("");
   }
 
-  // ========== Event Bindings ==========
+  // ==================== Events ====================
   brandSearchBtn.addEventListener("click", handleBrandSearch);
-  brandInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") handleBrandSearch();
-  });
-
+  brandInput.addEventListener("keydown", function (e) { if (e.key === "Enter") handleBrandSearch(); });
   questionAskBtn.addEventListener("click", handleQuestion);
-  questionInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") handleQuestion();
-  });
-
-  document.querySelectorAll(".hint-tag[data-q]").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      brandInput.value = this.dataset.q;
-      handleBrandSearch();
-    });
-  });
-
-  document.querySelectorAll(".hint-tag[data-live]").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      questionInput.value = this.dataset.live;
-      handleQuestion();
-    });
-  });
-
+  questionInput.addEventListener("keydown", function (e) { if (e.key === "Enter") handleQuestion(); });
+  document.querySelectorAll(".hint-tag[data-q]").forEach(function (b) { b.addEventListener("click", function () { brandInput.value = this.dataset.q; handleBrandSearch(); }); });
+  document.querySelectorAll(".hint-tag[data-live]").forEach(function (b) { b.addEventListener("click", function () { questionInput.value = this.dataset.live; handleQuestion(); }); });
   window.addEventListener("resize", resizeCharts);
 
-  // ========== Init ==========
   checkApiStatus();
 })();
