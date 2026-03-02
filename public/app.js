@@ -84,22 +84,35 @@
     heroSection.classList.add("compact");
     brandSearchBtn.disabled = true;
 
+    var dots = 0;
+    var loadTimer = setInterval(function () {
+      dots = (dots + 1) % 4;
+      var d = [".", "..", "...", ""][dots];
+      loadingText.textContent = "AI \u6b63\u5728\u6df1\u5ea6\u5206\u6790\u300c" + query + "\u300d\u7684 AI \u53ef\u89c1\u5ea6" + d + "\uff08\u7ea610-20\u79d2\uff09";
+    }, 600);
+
     apiPost("/api/analyze", { query: query })
       .then(function (data) {
+        clearInterval(loadTimer);
         loadingOverlay.classList.remove("show");
         brandSearchBtn.disabled = false;
 
         if (data.mode === "live" && data.brand) {
           renderAllFromAI(data, query);
-        } else if (data.mode === "demo" || data.mode === "error") {
-          renderFromPreset(query, data.message || data.error);
+        } else if (data.mode === "error") {
+          alert("AI\u5206\u6790\u5931\u8d25\uff1a" + (data.error || "\u672a\u77e5\u9519\u8bef") + "\n\u5c06\u5c55\u793a\u9884\u7f6e\u793a\u4f8b\u6570\u636e");
+          renderFromPreset(query, data.error);
+        } else if (data.mode === "demo") {
+          renderFromPreset(query, data.message);
         } else {
           renderFromPreset(query, null);
         }
       })
-      .catch(function () {
+      .catch(function (err) {
+        clearInterval(loadTimer);
         loadingOverlay.classList.remove("show");
         brandSearchBtn.disabled = false;
+        alert("\u7f51\u7edc\u8bf7\u6c42\u5931\u8d25\uff0c\u5c06\u5c55\u793a\u9884\u7f6e\u6570\u636e");
         renderFromPreset(query, null);
       });
   }
